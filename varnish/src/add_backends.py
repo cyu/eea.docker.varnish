@@ -13,6 +13,7 @@ BACKENDS_PROBE_TIMEOUT = os.environ.get('BACKENDS_PROBE_TIMEOUT', "1s").strip()
 BACKENDS_PROBE_INTERVAL = os.environ.get('BACKENDS_PROBE_INTERVAL', "1s").strip()
 BACKENDS_PROBE_WINDOW = os.environ.get('BACKENDS_PROBE_WINDOW', "3").strip()
 BACKENDS_PROBE_THRESHOLD = os.environ.get('BACKENDS_PROBE_THRESHOLD', "2").strip()
+DOCKERCLOUD_SERVICE_BACKENDS = os.environ.get('DOCKERCLOUD_SERVICE_BACKENDS', '').strip()
 
 init_conf = """
 import std;
@@ -157,6 +158,56 @@ elif sys.argv[1] == "env":
 
     init_conf += "}"
     recv_conf = recv_conf % dict(director=name)
+
+
+################################################################################
+# Backends provided via Docker Cloud service links  environment variables
+################################################################################
+
+elif sys.argv[1] == "dockercloud":
+    name = "backends"
+    directors = set()
+    ip_addr_key = "%(service)s_%(index)s_ENV_DOCKERCLOUD_IP_ADDRESS"
+    index = 1
+    ip_addr = os.environ.get(ip_addr_key % dict(
+        service=DOCKERCLOUD_SERVICE_BACKENDS.upper(),
+        index=index
+    ), '').strip().split("/")[0]
+    while ip_addr != "":
+        name = toName(ip_addr)
+        port = BACKENDS_PORT
+        backend_conf += backend_conf_add % dict(
+                name=name,
+                index=index-1,
+                host=ip_addr,
+                port=port,
+                probe_url=BACKENDS_PROBE_URL,
+                probe_timeout=BACKENDS_PROBE_TIMEOUT,
+                probe_interval=BACKENDS_PROBE_INTERVAL,
+                probe_window=BACKENDS_PROBE_WINDOW,
+                probe_threshold=BACKENDS_PROBE_THRESHOLD
+        )
+
+        if name not in directors:
+            directors.add(name)
+            init_conf += init_conf_director % dict(director=name)
+
+        init_conf += init_conf_backend % dict(
+            director=name,
+            name=name,
+            index=index-1
+        )
+        FOUND_BACKENDS = True
+
+        index += 1
+        ip_addr = os.environ.get(ip_addr_key % dict(
+            service=DOCKERCLOUD_SERVICE_BACKENDS.upper(),
+            index=index
+        ), '').strip().split("/")[0]
+
+    init_conf += "}"
+    recv_conf = recv_conf % dict(director=name)
+
 
 ################################################################################
 # Look for backend within /etc/hosts

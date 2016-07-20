@@ -13,6 +13,12 @@ if [ ! -z "$BACKENDS" ]; then
   exit $?
 fi
 
+if [ ! -z "$DOCKERCLOUD_SERVICE_BACKENDS" ]; then
+  # Backend provided via Docker Cloud service links
+  python3 /add_backends.py dockercloud
+  exit $?
+fi
+
 # Backend vcl files directly added to /etc/varnish/conf.d/
 if test "$(ls -A /etc/varnish/conf.d/)"; then
     exit 0
